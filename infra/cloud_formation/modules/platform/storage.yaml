@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Storage Module (S3 for uploads)
+
+Parameters:
+  Env:
+    Type: String
+
+Resources:
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "python-flask-upload-bucket-${Env}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true # スタック削除時にバケットも消す
+
+  # GuardDuty実行用ロール
+  GDMalwareProtectionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "GuardDutyMalwareProtectionRole-${AWS::Region}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: malware-protection-plan.guardduty.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3AccessForMalwareScanning
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:GetBucketNotification
+                  - s3:PutBucketNotification
+                Resource:
+                  - !GetAtt UploadBucket.Arn
+                  - !Sub "${UploadBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObjectTagging
+                  - s3:GetObjectTagging
+                  - s3:PutObjectVersionTagging
+                  - s3:GetObjectVersionTagging
+                Resource:
+                  - !Sub "${UploadBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:DeleteRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                Resource:
+                  - !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/DO-NOT-DELETE-AmazonGuardDutyMalwareProtectionS3*"
+  # マルウェアチェック設定
+  MyMalwareProtectionPlan:
+    Type: AWS::GuardDuty::MalwareProtectionPlan
+    Properties:
+      Role: !GetAtt GDMalwareProtectionRole.Arn
+      ProtectedResource:
+        S3Bucket:
+          BucketName: !Ref UploadBucket
+      Actions:
+        Tagging:
+          Status: ENABLED # スキャン結果をS3オブジェクトのタグに付与する
+
+Outputs:
+  S3UploadBucketId:
+    Value: !Ref UploadBucket
+  S3UploadBucketArn:
+    Value: !GetAtt UploadBucket.Arn
+  PlanId:
+    Value: !Ref MyMalwareProtectionPlan

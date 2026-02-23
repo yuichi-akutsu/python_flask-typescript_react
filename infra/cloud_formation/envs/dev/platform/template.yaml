@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Platform Layer (Parent Stack)
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+
+Resources:
+  # Network
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../modules/platform/network.yaml
+      Parameters:
+        Env: !Ref Env
+        VpcCidrBlock: 10.0.0.0/16
+
+  # Auth
+  AuthStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../modules/platform/auth.yaml
+      Parameters:
+        Env: !Ref Env
+
+  # Storage
+  StorageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../modules/platform/storage.yaml
+      Parameters:
+        Env: !Ref Env
+
+  # ECR
+  EcrStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../modules/platform/ecr.yaml
+      Parameters:
+        Env: !Ref Env
+        Name: backend
+
+  # Security Group
+  AlbSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Env}-alb-sg"
+      GroupDescription: Allow HTTP from Internet
+      VpcId: !GetAtt NetworkStack.Outputs.VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+  AppSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Env}-app-sg"
+      GroupDescription: Allow HTTP from ALB only
+      VpcId: !GetAtt NetworkStack.Outputs.VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref AlbSg # ALBのSGIDを指定して許可
+
+  # # DB
+  # DatabaseStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: ../../../modules/platform/database.yaml
+  #     Parameters:
+  #       Env: !Ref Env
+  #       VpcId: !GetAtt NetworkStack.Outputs.VpcId
+  #       DbSubnetGroupName: !GetAtt NetworkStack.Outputs.DBSubnetGroupName
+  #       SourceSecurityGroupId: !Ref AppSg
+
+Outputs:
+  VpcId:
+    Value: !GetAtt NetworkStack.Outputs.VpcId
+    Export: { Name: !Sub "${Env}-VpcId" }
+
+  PublicSubnets:
+    Value: !GetAtt NetworkStack.Outputs.PublicSubnets
+    Export: { Name: !Sub "${Env}-PublicSubnets" }
+
+  PrivateSubnets:
+    Value: !GetAtt NetworkStack.Outputs.PrivateSubnets
+    Export: { Name: !Sub "${Env}-PrivateSubnets" }
+
+  # DbEndpoint:
+  #   Value: !GetAtt DatabaseStack.Outputs.DbEndpoint
+  #   Export: { Name: !Sub "${Env}-DbEndpoint" }
+
+  AlbSgId:
+    Value: !Ref AlbSg
+    Export: { Name: !Sub "${Env}-AlbSgId" }
+  AppSgId:
+    Value: !Ref AppSg
+    Export: { Name: !Sub "${Env}-AppSgId" }
+
+  EcrRepositoryUrl:
+    Value: !GetAtt EcrStack.Outputs.RepositoryUrl
+    Export: { Name: !Sub "${Env}-EcrRepositoryUrl" }
+
+  CognitoUserPoolId:
+    Value: !GetAtt AuthStack.Outputs.CognitoUserPoolId
+    Export: { Name: !Sub "${Env}-CognitoUserPoolId" }
+
+  S3UploadBucketId:
+    Value: !GetAtt StorageStack.Outputs.S3UploadBucketId
+    Export: { Name: !Sub "${Env}-S3UploadBucketId" }

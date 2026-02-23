@@ -1,0 +1,2 @@
+FROM jagregory/cognito-local
+COPY ./cognito_data /app/.cognito

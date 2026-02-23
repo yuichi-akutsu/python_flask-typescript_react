@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SNS Topic linked to SQS Queue (Fan-out Pattern)
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    Description: Environment name (e.g., dev, prod)
+
+Resources:
+  MyTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "my-app-topic-${Env}"
+
+  MyQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "my-app-queue-${Env}"
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 345600
+
+  MySubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref MyTopic
+      Protocol: sqs
+      Endpoint: !GetAtt MyQueue.Arn
+      RawMessageDelivery: true
+
+  MyQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref MyQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: Allow-SNS-SendMessage
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt MyQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref MyTopic
+
+Outputs:
+  SNSTopicArn:
+    Description: "ARN of the SNS Topic (Use this for sns.publish)"
+    Value: !Ref MyTopic
+
+  SQSQueueUrl:
+    Description: "URL of the SQS Queue (Use this for sqs.receive_message)"
+    Value: !Ref MyQueue

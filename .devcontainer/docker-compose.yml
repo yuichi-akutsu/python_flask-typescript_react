@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/python:3
+    volumes:
+      # プロジェクトルート全体を /workspace にマウント
+      - ..:/workspace:cached
+
+    command: sleep infinity
+
+    depends_on:
+      - db
+      - cognito-local
+
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=user
+      - DB_PASS=password
+      - DB_NAME=myapp_db
+      - FLASK_APP=backend/app/wsgi.py
+      - FLASK_DEBUG=1
+      - COGNITO_LOCAL_ENDPOINT=http://cognito_local:9229
+
+    ports:
+      - "5000:5000"
+      - "5173:5173"
+  db:
+    image: postgres:15
+    restart: always
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../db/init:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=myapp_db
+
+    ports:
+      - "5432:5432"
+
+  cognito-local:
+    container_name: "cognito_local"
+    build:
+      context: .
+      dockerfile: cognito_dockerfile
+    ports:
+      - "9229:9229"
+
+  # localstack:
+  #   image: localstack/localstack:latest
+  #   ports:
+  #     - "4566:4566"
+  #     - "4571:4571"
+  #   environment:
+  #     - SERVICES=s3,cognito,sqs,sts
+  #     - DEFAULT_REGION=us-east-1
+  #     - DATA_DIR=/tmp/localstack/data
+  #   # volumes:
+  #   #   - "./localstack_data:/tmp/localstack"
+  #   #   - "/var/run/docker.sock:/var/run/docker.sock"
+volumes:
+  postgres-data:

@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Service Layer (Parent Stack)
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+
+Resources:
+  BackendStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../modules/service/backend.yaml
+      Parameters:
+        Env: !Ref Env
+        # PlatformスタックからのImport
+        VpcId:
+          Fn::ImportValue: !Sub "${Env}-VpcId"
+        PublicSubnets:
+          Fn::ImportValue: !Sub "${Env}-PublicSubnets"
+        PrivateSubnets:
+          Fn::ImportValue: !Sub "${Env}-PrivateSubnets"
+        AlbSgId:
+          Fn::ImportValue: !Sub "${Env}-AlbSgId"
+        EcsSgId:
+          Fn::ImportValue: !Sub "${Env}-AppSgId"
+        EcrRepositoryUrl:
+          Fn::ImportValue: !Sub "${Env}-EcrRepositoryUrl"
+  BatchStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../modules/service/batch.yaml
+      Parameters:
+        Env: !Ref Env
+        TargetBucketArn:
+          Fn::ImportValue: !Sub "${Env}-S3UploadBucketId"
+  SnsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../modules/service/sns.yaml
+      Parameters:
+        Env: !Ref Env
+
+Outputs:
+  AlbUrl:
+    Value: !GetAtt BackendStack.Outputs.AlbDnsName

@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda triggered by GuardDuty Malware Scan Result
+
+Parameters:
+  Env:
+    Type: String
+  TargetBucketArn:
+    Type: String
+
+Resources:
+  PostScanProcessingFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: LambdaLogGroup
+    Properties:
+      FunctionName: !Sub "guardduty-post-scan-processor-${Env}"
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+
+          def lambda_handler(event, context):
+              print("Received event:", json.dumps(event))
+              
+              # EventBridgeからの詳細情報を取得
+              detail = event.get('detail', {})
+              s3_resource = detail.get('resource', {})
+              
+              bucket_name = s3_resource.get('s3BucketDetails', {}).get('name')
+              object_key = s3_resource.get('s3ObjectDetails', {}).get('key')
+              scan_status = detail.get('scanResultDetails', {}).get('scanResultStatus')
+              
+              print(f"File: {object_key} in {bucket_name} is {scan_status}")
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Process completed')
+              }
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  ScanResultRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "trigger-on-s3-tagging-${Env}"
+      Description: Trigger Lambda when tags are added to S3 object
+      EventPattern:
+        source:
+          - "aws.s3"
+        detail-type:
+          - "Object Tagging Put"
+        detail:
+          bucket:
+            name:
+              - !Ref TargetBucketArn
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt PostScanProcessingFunction.Arn
+          Id: "TargetLambda"
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PostScanProcessingFunction
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ScanResultRule.Arn
+
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/guardduty-post-scan-processor-${Env}"
+      RetentionInDays: 14

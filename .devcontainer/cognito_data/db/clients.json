@@ -1,0 +1,16 @@
+{
+  "Clients": {
+    "cva59fhcy8ywphd03lsc27182": {
+      "ClientId": "cva59fhcy8ywphd03lsc27182",
+      "ClientName": "local-client",
+      "CreationDate": "2026-01-08T12:40:12.877Z",
+      "LastModifiedDate": "2026-01-08T12:40:12.877Z",
+      "TokenValidityUnits": {
+        "AccessToken": "hours",
+        "IdToken": "minutes",
+        "RefreshToken": "days"
+      },
+      "UserPoolId": "local_7KRcM6xl"
+    }
+  }
+}

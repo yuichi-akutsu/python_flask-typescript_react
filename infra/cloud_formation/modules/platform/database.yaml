@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Database Module (RDS Postgres)
+
+Parameters:
+  Env:
+    Type: String
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  DbSubnetGroupName:
+    Type: String
+  SourceSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: SG ID of the ECS tasks allowed to access DB
+
+Resources:
+  DBSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${Env}/rds/db-admin-password"
+      Description: !Sub "RDS Admin Password for ${Env}"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "dbadmin"}'
+        GenerateStringKey: "password"
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${Env}-db-sg"
+      GroupDescription: Security group for RDS
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref SourceSecurityGroupId
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${Env}-db"
+      AllocatedStorage: "20"
+      StorageType: gp3
+      Engine: postgres
+      EngineVersion: "15"
+      DBInstanceClass: db.t4g.micro
+      DBName: myappdb
+      MasterUsername: dbadmin
+      MasterUserPassword: !Ref DbPassword
+      DBSubnetGroupName: !Ref DbSubnetGroupName
+      MasterUsername: !Join ["", ["{{resolve:secretsmanager:", !Ref DBSecret, ":SecretString:username}}"]]
+      MasterUserPassword: !Join ["", ["{{resolve:secretsmanager:", !Ref DBSecret, ":SecretString:password}}"]]
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      DeleteAutomatedBackups: true
+
+  DBSecretTargetAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref DBSecret
+      TargetId: !Ref DBInstance
+      TargetType: AWS::RDS::DBInstance
+
+Outputs:
+  DbEndpoint:
+    Value: !GetAtt DBInstance.Endpoint.Address
+  SecretArn:
+    Value: !Ref DBSecret
