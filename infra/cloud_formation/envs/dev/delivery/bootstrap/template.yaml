@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Delivery bootstrap
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+
+Resources:
+  StorageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../../modules/delivery/bootstrap/storage.yaml
+      Parameters:
+        Env: !Ref Env
+        GitHubConnectionArn: arn:aws:codeconnections:ap-northeast-1:086571702091:connection/c6e3b130-b815-4723-a986-9ff79d40575b
+        FullRepositoryId: yuichi-akutsu/python_flask-typescript_react
+        BranchName: "pipeline_test"
+  RoleStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ../../../../modules/delivery/bootstrap/role.yaml
+      Parameters:
+        Env: !Ref Env
+        GitHubConnectionArn: arn:aws:codeconnections:ap-northeast-1:086571702091:connection/c6e3b130-b815-4723-a986-9ff79d40575b
+        FullRepositoryId: yuichi-akutsu/python_flask-typescript_react
+        BranchName: "pipeline_test"

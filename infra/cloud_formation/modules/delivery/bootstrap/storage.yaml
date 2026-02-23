@@ -1,0 +1,17 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CI/CD Pipeline for ECS Backend
+
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+
+Resources:
+  # アーティファクト保存用のS3バケット
+  PipelineBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Env}-codepipeline-artifacts"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
