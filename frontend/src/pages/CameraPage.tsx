@@ -1,187 +1,105 @@
-import { useRef, useState, useCallback, useEffect } from "react"
-import { Camera, RefreshCw, Upload, Image as ImageIcon } from "lucide-react"
+import { useRef, useState } from "react"
+import { Camera, Image as ImageIcon, Upload, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
-
 export function CameraPage() {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  
-  const [stream, setStream] = useState<MediaStream | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const [error, setError] = useState<string>("")
+  
+  // 2つの異なるinput要素を用意
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
 
-  // カメラを起動する関数
-  const startCamera = useCallback(async () => {
-    setError("")
-    try {
-      // スマホの背面カメラ（environment）を優先的に要求
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false,
-      })
-      setStream(mediaStream)
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-      }
-    } catch (err: any) {
-      console.error("カメラの起動に失敗しました:", err)
-      setError("カメラへのアクセスが許可されていないか、カメラが見つかりません。")
-    }
-  }, [])
-
-  // カメラを停止する関数（コンポーネント破棄時や撮影後に使用）
-  const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop())
-      setStream(null)
-    }
-  }, [stream])
-
-  // コンポーネントのマウント時にカメラを起動し、アンマウント時に停止
-  useEffect(() => {
-    startCamera()
-    return () => {
-      stopCamera()
-    }
-  }, [startCamera]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // シャッターを切る関数
-  const captureImage = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current
-      const canvas = canvasRef.current
-      const context = canvas.getContext("2d")
-
-      if (context) {
-        // キャンバスのサイズをビデオの解像度に合わせる
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        // ビデオの現在のフレームをキャンバスに描画
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        
-        // 画像を Base64 形式の Data URL として取得 (JPEG形式, 画質0.8)
-        const imageUrl = canvas.toDataURL("image/jpeg", 0.8)
-        setCapturedImage(imageUrl)
-        
-        // 撮影後はカメラを一旦止める（バッテリー節約のため）
-        stopCamera()
-      }
-    }
-  }
-
-  // 再撮影する関数
-  const retakeImage = () => {
-    setCapturedImage(null)
-    startCamera()
-  }
-
-  // 画像を送信・保存する関数（ダミー）
-  const handleUpload = () => {
-    if (!capturedImage) return
-    console.log("アップロードする画像データ:", capturedImage)
-    alert("画像をアップロードしました！（Consoleを確認してください）")
-    // TODO: ここでS3やFlask APIに画像を送信する処理を書く
-  }
-
-  const triggerFileInput = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click()
-    }
-  }
-
+  // 画像が選択・撮影された時の共通処理
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    // FileReader を使って画像を Base64 形式で読み込む
+    // FileReaderで画像をBase64に変換してプレビュー表示
     const reader = new FileReader()
     reader.onload = (e) => {
       if (e.target?.result) {
         setCapturedImage(e.target.result as string)
-        stopCamera() // 画像が選ばれたらカメラのストリームは停止して節約する
       }
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleUpload = () => {
+    if (!capturedImage) return
+    alert("画像をアップロードします！")
+    // TODO: 実際のアップロード処理
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <Card className="w-full max-w-md shadow-md">
         <CardHeader>
-          <CardTitle className="text-xl">画像撮影</CardTitle>
+          <CardTitle className="text-xl">画像アップロード</CardTitle>
           <CardDescription>
-            対象物をフレームに収めて撮影してください。
+            写真を撮影するか、アルバムから選択してください。
           </CardDescription>
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {error && <div className="text-sm text-red-500 font-medium">{error}</div>}
-          
-          {/* カメラのプレビュー領域 or 撮影した画像の確認領域 */}
-          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md bg-slate-900">
-            {!capturedImage ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full object-cover"
-              />
+          {/* プレビュー領域 */}
+          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md bg-slate-200 flex items-center justify-center border-2 border-dashed border-slate-300">
+            {capturedImage ? (
+              <img src={capturedImage} alt="Preview" className="h-full w-full object-contain" />
             ) : (
-              <img
-                src={capturedImage}
-                alt="Captured"
-                className="h-full w-full object-cover"
-              />
+              <span className="text-slate-400 text-sm">画像がありません</span>
             )}
-            
-            {/* 非表示のCanvas（画像データ生成用） */}
-            <canvas ref={canvasRef} className="hidden" />
           </div>
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4 pb-6">
           {!capturedImage ? (
-            // === 撮影前のボタン群 ===
             <div className="flex w-full flex-col gap-3">
+              {/* 1. カメラを直接起動するボタン */}
               <Button 
                 size="lg" 
                 className="w-full h-14 rounded-full" 
-                onClick={captureImage}
-                disabled={!stream}
+                onClick={() => cameraInputRef.current?.click()}
               >
                 <Camera className="mr-2 h-6 w-6" />
-                撮影する
+                カメラを起動
               </Button>
               
+              {/* 2. ポップアップ（またはアルバム）を開くボタン */}
               <Button 
                 variant="outline" 
                 size="lg" 
                 className="w-full h-14 rounded-full" 
-                onClick={triggerFileInput}
+                onClick={() => galleryInputRef.current?.click()}
               >
                 <ImageIcon className="mr-2 h-6 w-6" />
-                アルバムから選ぶ
+                ライブラリから選ぶ
               </Button>
-              
-              {/* 隠しファイル入力: accept="image/*" で画像のみに制限 */}
+
+              {/* 隠しInput群 */}
+              {/* capture="environment" を付けると直接カメラが起動しやすい */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                ref={cameraInputRef}
+                onChange={handleFileSelect}
+              />
+              {/* capture無しだとOS標準の選択ポップアップが出る */}
               <input
                 type="file"
                 accept="image/*"
                 className="hidden"
-                ref={fileInputRef}
+                ref={galleryInputRef}
                 onChange={handleFileSelect}
               />
             </div>
           ) : (
-            // === 撮影後 / 選択後のボタン群 ===
             <div className="flex w-full gap-2">
-              <Button variant="outline" className="w-1/2" onClick={retakeImage}>
+              <Button variant="outline" className="w-1/2" onClick={() => setCapturedImage(null)}>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                やり直す
+                クリア
               </Button>
               <Button className="w-1/2" onClick={handleUpload}>
                 <Upload className="mr-2 h-4 w-4" />
