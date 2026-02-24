@@ -2,6 +2,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, g
 from flask_sqlalchemy import SQLAlchemy
 from app.config import Config
+from flask_cors import CORS
 
 import jwt
 from jwt import PyJWKClient
@@ -16,6 +17,14 @@ jwks_client = PyJWKClient(JWKS_URL)
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": ["http://localhost:5173"],
+            "methods": ["OPTIONS", "GET", "POST", "PUT", "DELETE"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
 
     # DBとアプリを紐付け
     db.init_app(app)

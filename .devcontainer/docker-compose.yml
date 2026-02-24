@@ -48,17 +48,17 @@ services:
     ports:
       - "9229:9229"
 
-  # localstack:
-  #   image: localstack/localstack:latest
-  #   ports:
-  #     - "4566:4566"
-  #     - "4571:4571"
-  #   environment:
-  #     - SERVICES=s3,cognito,sqs,sts
-  #     - DEFAULT_REGION=us-east-1
-  #     - DATA_DIR=/tmp/localstack/data
-  #   # volumes:
-  #   #   - "./localstack_data:/tmp/localstack"
-  #   #   - "/var/run/docker.sock:/var/run/docker.sock"
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    environment:
+      - SERVICES=s3,sqs,sts
+      - DEFAULT_REGION=us-east-1
+      - DATA_DIR=/tmp/localstack/data
+    # volumes:
+    #   - "./localstack_data:/tmp/localstack"
+    #   - "/var/run/docker.sock:/var/run/docker.sock"
 volumes:
   postgres-data:

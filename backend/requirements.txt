@@ -6,3 +6,7 @@ pyjwt[crypto]
 
 # Server
 gunicorn
+
+boto3
+flask-cors
+Werkzeug

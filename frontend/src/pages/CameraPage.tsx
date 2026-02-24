@@ -25,10 +25,40 @@ export function CameraPage() {
     reader.readAsDataURL(file)
   }
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!capturedImage) return
-    alert("画像をアップロードします！")
-    // TODO: 実際のアップロード処理
+    
+    try {
+      // 1. Base64文字列を Blob (ファイルオブジェクト) に変換
+      const res = await fetch(capturedImage)
+      const blob = await res.blob()
+      
+      // 2. フォームデータを作成 (Flask側で 'file' という名前で受け取るため)
+      const formData = new FormData()
+      formData.append("file", blob, "captured_image.jpg")
+
+      // 3. Flask API へ POST リクエスト
+      const uploadRes = await fetch("http://localhost:5000/api/upload", {
+        method: "POST",
+        body: formData,
+        // 注意: fetchでFormDataを送る場合、'Content-Type'ヘッダーは手動で設定してはいけません（ブラウザが自動設定します）
+      })
+
+      if (!uploadRes.ok) {
+        throw new Error(`アップロード失敗: ${uploadRes.status}`)
+      }
+
+      const data = await uploadRes.json()
+      console.log("アップロード成功:", data)
+      alert("S3への保存が完了しました！")
+      
+      // 送信後は画面をリセット
+      setCapturedImage(null)
+
+    } catch (error) {
+      console.error("アップロードエラー:", error)
+      alert("エラーが発生しました。コンソールを確認してください。")
+    }
   }
 
   return (
